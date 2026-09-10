@@ -171,7 +171,7 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
               </div>
               <div className="border-t border-green-600/10 px-6 py-4">
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
-                  <span className="text-amber-600">📌 Importante:</span> Por favor descarga tu ticket en formato JPG o toma una captura de pantalla clara. Deberás presentar el código QR de este comprobante el día de tu cita.
+                  <span className="text-amber-600"> Importante:</span> Por favor descarga tu ticket en formato JPG o toma una captura de pantalla clara. Deberás presentar el código QR de este comprobante el día de tu cita.
                 </div>
                 <AnimatePresence>
                   {descargado && (

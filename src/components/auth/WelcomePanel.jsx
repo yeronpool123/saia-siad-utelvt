@@ -50,7 +50,7 @@ export default function WelcomePanel({ onLogin, onRegister }) {
 
         <h1 id="welcome-title" className="text-display mb-3 text-ink leading-tight">
           <TypewriterEffect /><br />
-          de <span className="text-green-700">Identidad y<br /> Accesos</span>
+          de <span className="bg-gradient-to-r from-green-700 via-green-500 to-green-700 bg-[length:200%_auto] animate-gradient text-transparent bg-clip-text">Identidad y<br /> Accesos</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-[clamp(1rem,2vw,1.12rem)] font-semibold leading-8 text-slate-600 lg:mx-0">
           SAIA-SIAD centraliza reseteos de contrasena, correos institucionales y credenciales SIAD

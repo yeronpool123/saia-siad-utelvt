@@ -16,7 +16,7 @@ export const listAuditLogs = async ({ page = 1, limit = 20, userId, accion, tick
     prisma.auditLog.findMany({
       where,
       include: {
-        usuario: { select: { id: true, email: true, nombre: true, apellido: true, rol: true } },
+        usuario: { select: { id: true, email: true, nombre: true, apellido: true, rol: true, cedula: true, facultad: true, carrera: true } },
         ticket: { select: { id: true, numero: true, titulo: true } },
       },
       orderBy: { createdAt: 'desc' },

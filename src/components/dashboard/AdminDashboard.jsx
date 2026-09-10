@@ -171,37 +171,33 @@ export default function AdminDashboard({ user, onLogout }) {
     try {
       setNotificacion(null)
       if (notifTimer.current) clearTimeout(notifTimer.current)
-      const res = await api.get('/admin/tickets?limit=10000')
-      const todos = res.data.data || []
+      const res = await api.get('/audit-logs?limit=10000')
+      const logs = res.data.data || []
       const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
       const filas = [
-        ['Numero', 'Titulo', 'Tipo', 'Prioridad', 'Estado', 'Creado', 'Atendido', 'Solicitante', 'Cedula', 'Email', 'Rol', 'Facultad', 'Carrera', 'Cargo', 'Especialista', 'Fecha cita', 'Hora cita', 'Descripcion'],
-        ...todos.map((t) => [
-          t.numero, t.titulo, t.tipo, t.prioridad, ESTADO_LABEL(t.estado), formatFecha(t.createdAt),
-          t.atendidoEn ? formatFecha(t.atendidoEn) : '',
-          [t.usuario?.nombre, t.usuario?.apellido].filter(Boolean).join(' '),
-          (t.metadata?.cedula) || t.usuario?.cedula || '',
-          t.usuario?.email,
-          ROL_LABEL[t.usuario?.rol] || t.usuario?.rol || '',
-          t.metadata?.facultadNombre || t.usuario?.facultad || '',
-          t.metadata?.carrera || t.usuario?.carrera || '',
-          t.metadata?.cargo || t.usuario?.cargo || '',
-          t.citaPersonal?.ingenieroNombre || '',
-          t.citaPersonal?.fechaAsignada ? formatDia(t.citaPersonal.fechaAsignada) : '',
-          t.citaPersonal?.horaAsignada || '',
-          t.descripcion,
+        ['ID de Transaccion / Log', 'Fecha y Hora Exacta (Timestamp)', 'Nombres y Apellidos del Usuario', 'Cedula de Identidad', 'Rol', 'Facultad y Carrera', 'Accion Realizada', 'Direccion IP', 'Dispositivo / User-Agent'],
+        ...logs.map((log) => [
+          log.id,
+          new Date(log.createdAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'medium' }),
+          log.usuario ? [log.usuario.nombre, log.usuario.apellido].filter(Boolean).join(' ') : 'Sistema',
+          log.usuario?.cedula || 'N/A',
+          log.usuario?.rol || 'N/A',
+          [log.usuario?.facultad, log.usuario?.carrera].filter(Boolean).join(' - ') || 'N/A',
+          log.accion,
+          log.ipAddress || '127.0.0.1',
+          log.userAgent || 'N/A'
         ]),
       ]
       const csv = filas.map((fila) => fila.map(escape).join(',')).join('\r\n')
       const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }))
       const link = document.createElement('a')
       link.href = url
-      link.download = `Reporte_Tickets_SAIA_${new Date().toISOString().split('T')[0]}.csv`
+      link.download = `Reporte_Auditoria_UTELVT_${new Date().toISOString().split('T')[0]}.csv`
       link.click()
       URL.revokeObjectURL(url)
-      notificar('Reporte diario exportado correctamente (CSV).', 'ok')
+      notificar('Reporte de auditoria exportado correctamente (CSV).', 'ok')
     } catch {
-      notificar('No se pudo generar el reporte.', 'error')
+      notificar('No se pudo generar el reporte de auditoria.', 'error')
     }
   }
 
@@ -462,15 +458,17 @@ function AdminHeader({ onRefresh, onLogout }) {
   )
 }
 
+
+
 function BannerEjecutivo({ onEscanear, onReporte }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 p-8 text-white shadow-2xl mb-8">
+    <div className="relative overflow-hidden bg-slate-900/80 backdrop-blur-md border border-emerald-500/20 shadow-2xl rounded-2xl p-6 text-white mb-8">
       <div className="relative z-10">
         <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-semibold uppercase tracking-wider">
           Panel de Control Central
         </span>
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
-          ¡Hola de nuevo, <span className="text-emerald-400">Admin</span>! 👋
+          ¡Hola de nuevo, <span className="text-emerald-400">Admin</span>!
         </h1>
         <p className="mt-2 max-w-2xl text-slate-300 text-sm leading-relaxed">
           Bienvenido al centro operativo SAIA-SIAD. Supervisa las solicitudes de soporte en tiempo
@@ -482,18 +480,21 @@ function BannerEjecutivo({ onEscanear, onReporte }) {
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             onClick={onEscanear}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 font-medium text-xs rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 font-medium text-xs rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer text-white"
           >
-            📷 Escanear Ticket QR
+            <QrCode className="h-4 w-4" /> Escanear Ticket QR
           </button>
           <button
             onClick={onReporte}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 font-medium text-xs rounded-lg backdrop-blur-sm transition-all cursor-pointer flex items-center gap-2"
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 font-medium text-xs rounded-lg backdrop-blur-sm transition-all cursor-pointer flex items-center gap-2 text-white"
           >
-            📊 Descargar Reporte Diario
+            <FileDown className="h-4 w-4" /> Descargar Reporte Diario
           </button>
         </div>
       </div>
+      
+      <div className="absolute top-0 right-0 -mr-20 -mt-20 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-48 w-48 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
     </div>
   )
 }

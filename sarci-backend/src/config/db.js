@@ -1,7 +1,20 @@
 // Mock Prisma Client
 const mockData = {
   tickets: [],
-  usuarios: [],
+  usuarios: [
+    {
+      id: "admin-123",
+      email: "admin@utelvt.edu.ec",
+      passwordHash: "$2b$10$FpeehfP/gkVJ9K0ryZvMmOSwD8QqQ7STCsG1ZNOkRaXiRUampvmY2",
+      nombre: "Administrador",
+      apellido: "UTELVT",
+      cedula: "0800000000",
+      rol: "SUPER_ADMIN",
+      activo: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+  ],
   citas: []
 };
 

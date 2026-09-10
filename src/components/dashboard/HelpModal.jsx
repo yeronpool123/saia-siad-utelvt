@@ -17,19 +17,19 @@ export default function HelpModal({ open, onClose }) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
           initial="hidden"
           animate="visible"
           exit="hidden"
         >
           <motion.div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
             variants={backdropVariants}
             onClick={onClose}
             aria-hidden="true"
           />
           <motion.div
-            className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-green-600/10 bg-white shadow-[0_32px_64px_rgba(0,0,0,0.2)]"
+            className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-green-600/10 bg-white shadow-[0_32px_64px_rgba(0,0,0,0.2)] my-auto"
             variants={modalVariants}
             role="dialog"
             aria-modal="true"
@@ -86,13 +86,13 @@ export default function HelpModal({ open, onClose }) {
                   <p className="text-sm font-semibold text-slate-600">soporte@utelvt.edu.ec</p>
                   <p className="mt-1 text-xs font-bold text-slate-400">Respuesta en 24-48 hrs</p>
                 </div>
-                <div className="rounded-2xl border border-green-600/10 bg-white p-4">
+                <div className="rounded-2xl border border-green-600/10 bg-white p-4 sm:col-span-2">
                   <h3 className="mb-2 flex items-center gap-2 text-sm font-extrabold text-green-800">
                     <Clock className="h-4 w-4 text-green-600" />
-                    Horarios
+                    Horarios de Atención
                   </h3>
-                  <p className="text-sm font-semibold text-slate-600">Lun - Vie, 8:00 - 17:00</p>
-                  <p className="mt-1 text-xs font-bold text-slate-400">Sabados, 9:00 - 13:00</p>
+                  <p className="text-sm font-semibold text-slate-600">Lunes a Viernes de 08:00 AM a 04:30 PM</p>
+                  <p className="mt-1 text-xs font-bold text-slate-400">Sábados, Domingos y Feriados Nacionales/Institucionales: No hay atención al público.</p>
                 </div>
               </div>
             </div>
