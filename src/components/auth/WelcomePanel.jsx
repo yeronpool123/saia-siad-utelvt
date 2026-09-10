@@ -35,27 +35,23 @@ export default function WelcomePanel({ onLogin, onRegister }) {
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         className="text-center lg:text-left"
       >
-        {/* AQUÍ ESTÁ EL LOGO INSERTADO */}
-        <div className="mb-8 flex justify-center lg:justify-start lg:-ml-28">
-          <img 
-            src="/logo-utelvt.png" 
-            alt="Logo Oficial UTELVT" 
-            className="h-24 w-auto object-contain drop-shadow-sm" 
-          />
+        <div className="mb-8 flex flex-col items-center lg:items-start lg:-ml-28">
+          <div className="flex flex-col items-center">
+            <div className="logo-shimmer relative inline-block">
+              <img 
+                src="/logo-utelvt.png" 
+                alt="Logo Oficial UTELVT" 
+                className="h-28 sm:h-32 lg:h-40 w-auto object-contain drop-shadow-sm" 
+              />
+            </div>
+            <p className="text-caption mt-3 text-green-700 text-center">Portal institucional UTELVT</p>
+          </div>
         </div>
 
-        <p className="text-caption mb-3 text-green-700">Portal institucional UTELVT</p>
-        <h1 id="welcome-title" className="text-display mb-3 text-ink">
-          <span className="text-grad-animate">SAIA-SIAD</span>
+        <h1 id="welcome-title" className="text-display mb-3 text-ink leading-tight">
+          <TypewriterEffect /><br />
+          de <span className="text-green-700">Identidad y<br /> Accesos</span>
         </h1>
-        <p className="mx-auto mb-4 max-w-2xl text-[clamp(1rem,2vw,1.12rem)] font-extrabold leading-8 text-green-800 lg:mx-0">
-          Sistema Automatizado de Atención e Incidencias Administrativas
-        </p>
-        <div className="mb-1 flex items-center justify-center gap-3 lg:justify-start">
-          <span className="hidden h-px flex-1 max-w-16 bg-linear-to-r from-transparent to-green-600/40 sm:block" aria-hidden="true" />
-          <TypewriterEffect />
-          <span className="hidden h-px flex-1 max-w-16 bg-linear-to-l from-transparent to-green-600/40 sm:block" aria-hidden="true" />
-        </div>
         <p className="mx-auto mt-5 max-w-2xl text-[clamp(1rem,2vw,1.12rem)] font-semibold leading-8 text-slate-600 lg:mx-0">
           SAIA-SIAD centraliza reseteos de contrasena, correos institucionales y credenciales SIAD
           en una experiencia limpia, segura y rapida.

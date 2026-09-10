@@ -18,7 +18,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // ─── ENUMERACIONES ───────────────────────────────────────

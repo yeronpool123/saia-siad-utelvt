@@ -84,7 +84,13 @@ export const getAllTickets = async (req, res) => {
   const { page = 1, limit = 20, estado, buscar } = req.query;
 
   const where = {};
-  if (estado) where.estado = estado;
+  if (estado) {
+    if (estado === 'ATENDIDO,RESUELTO') {
+      where.estado = { in: ['ATENDIDO', 'RESUELTO'] };
+    } else {
+      where.estado = estado;
+    }
+  }
   if (buscar) {
     where.OR = [
       { titulo: { contains: buscar, mode: 'insensitive' } },

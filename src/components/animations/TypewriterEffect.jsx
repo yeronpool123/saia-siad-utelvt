@@ -5,13 +5,14 @@ const HOLD_TIME = 2000
 const BACKSPACE_SPEED = 40
 
 const DINAMIC_PHRASES = [
-  'Automatizar la gestión técnica universitaria',
-  'Digitalizar solicitudes y tickets institucionales',
-  'Agilizar la atención docente y estudiantil',
-  'Optimizar los tiempos de respuesta en soporte TI',
+  'Automatizacion',
+  'Agilizacion',
+  'Aceleracion',
+  'Administracion',
+  'Actualizacion'
 ]
 
-export default function TypewriterEffect({ typingSpeed = TYPING_SPEED, holdTime = HOLD_TIME, backspaceSpeed = BACKSPACE_SPEED }) {
+export default function TypewriterEffect({ typingSpeed = 80, holdTime = 3000, backspaceSpeed = 50 }) {
   const [phraseIndex, setPhraseIndex] = useState(0)
   const [text, setText] = useState('')
   const [phase, setPhase] = useState('typing')

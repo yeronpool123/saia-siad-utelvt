@@ -206,12 +206,19 @@ export default function AdminDashboard({ user, onLogout }) {
   }
 
   const resumen = dashboard?.resumen
-  const kpis = useMemo(() => [
-    { key: 'PENDIENTE', label: 'Pendientes', valor: resumen?.pendientes || 0, icon: Clock, grad: 'from-amber-400 to-amber-500', ring: 'ring-amber-200', base: 'bg-amber-50', tick: 'text-amber-600' },
-    { key: 'EN_PROCESO', label: 'En proceso', valor: resumen?.enProceso || 0, icon: RefreshCcw, grad: 'from-blue-400 to-blue-500', ring: 'ring-blue-200', base: 'bg-blue-50', tick: 'text-blue-600' },
-    { key: 'ATENDIDO', label: 'Atendidos', valor: resumen?.atendidos || 0, icon: CheckCircle2, grad: 'from-green-500 to-green-600', ring: 'ring-green-200', base: 'bg-green-50', tick: 'text-green-600' },
-    { key: 'RESUELTO', label: 'Resueltos', valor: resumen?.resueltos || 0, icon: ShieldCheck, grad: 'from-emerald-400 to-emerald-600', ring: 'ring-emerald-200', base: 'bg-emerald-50', tick: 'text-emerald-600' },
-  ], [resumen])
+  const kpis = useMemo(() => {
+    const total = resumen?.totalTickets || 0
+    const pendientes = resumen?.pendientes || 0
+    const enProceso = resumen?.enProceso || 0
+    const resueltos = (resumen?.atendidos || 0) + (resumen?.resueltos || 0)
+
+    return [
+      { key: 'TOTAL', label: 'Total de Tickets', valor: total, icon: ScanLine, grad: 'from-slate-700 to-slate-900', ring: 'ring-slate-200', base: 'bg-slate-50', tick: 'text-slate-800', tipo: 'sparkline', sparkData: [total * 0.4, total * 0.7, total * 0.9, total] },
+      { key: 'PENDIENTE', label: 'Pendientes', valor: pendientes, icon: Clock, grad: 'from-amber-400 to-amber-500', ring: 'ring-amber-200', base: 'bg-amber-50', tick: 'text-amber-600', tipo: 'pulso' },
+      { key: 'EN_PROCESO', label: 'En proceso', valor: enProceso, icon: RefreshCcw, grad: 'from-blue-400 to-blue-500', ring: 'ring-blue-200', base: 'bg-blue-50', tick: 'text-blue-600', tipo: 'progreso', porcentaje: total > 0 ? (enProceso / total) * 100 : 0 },
+      { key: 'ATENDIDO_RESUELTO', label: 'Atendidos / Resueltos', valor: resueltos, icon: CheckCircle2, grad: 'from-emerald-400 to-emerald-600', ring: 'ring-emerald-200', base: 'bg-emerald-50', tick: 'text-emerald-600', tipo: 'check' },
+    ]
+  }, [resumen])
 
   if (view === 'scanner') {
     return (
@@ -252,19 +259,20 @@ export default function AdminDashboard({ user, onLogout }) {
         <>
           <section className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {kpis.map((kpi, idx) => {
-              const activo = filtroEstado === kpi.key
+              const activo = filtroEstado === kpi.key || (filtroEstado === 'ATENDIDO,RESUELTO' && kpi.key === 'ATENDIDO_RESUELTO')
               return (
                 <motion.button
                   key={kpi.key}
-                  onClick={() => setFiltroEstado(activo ? '' : kpi.key)}
+                  onClick={() => setFiltroEstado(activo ? '' : (kpi.key === 'ATENDIDO_RESUELTO' ? 'ATENDIDO,RESUELTO' : kpi.key))}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.06 }}
                   className={`group cursor-pointer rounded-2xl p-4 text-left ring-1 transition-all ${activo ? `bg-white shadow-[0_12px_32px_rgb(0,102,51,0.14)] ring-2 ${kpi.ring}` : 'bg-white/60 ring-white/60 backdrop-blur-xl hover:bg-white hover:shadow-[0_12px_32px_rgb(0,102,51,0.10)]'}`}
                 >
                   <div className="mb-3 flex items-center justify-between">
-                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br text-white ${kpi.grad} ${activo ? 'shadow-[0_6px_16px_rgb(0,102,51,0.25)]' : ''}`}>
-                      <kpi.icon className="h-5 w-5" aria-hidden="true" />
+                    <span className={`relative flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br text-white ${kpi.grad} ${activo ? 'shadow-[0_6px_16px_rgb(0,102,51,0.25)]' : ''}`}>
+                      <kpi.icon className="h-5 w-5 relative z-10" aria-hidden="true" />
+                      {kpi.tipo === 'pulso' && <span className="absolute inset-0 rounded-xl bg-amber-400 animate-ping opacity-75" />}
                     </span>
                     <span className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                       <ScanLine className="h-3 w-3" aria-hidden="true" />
@@ -273,7 +281,21 @@ export default function AdminDashboard({ user, onLogout }) {
                   </div>
                   <p className={`text-3xl font-black ${kpi.tick}`}>{kpi.valor}</p>
                   <p className="mt-1 text-xs font-extrabold text-slate-600">{kpi.label}</p>
-                  <Sparkline valores={[resumen?.pendientes || 0, resumen?.enProceso || 0, resumen?.atendidos || 0, resumen?.resueltos || 0].map((v) => (v + kpi.valor))} tone={kpi.tick.split('-')[1]} />
+                  
+                  {kpi.tipo === 'sparkline' && (
+                    <Sparkline valores={kpi.sparkData} tone="slate" />
+                  )}
+                  {kpi.tipo === 'progreso' && (
+                    <div className="mt-3 h-1.5 w-full rounded-full bg-blue-100 overflow-hidden">
+                      <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${kpi.porcentaje}%` }} />
+                    </div>
+                  )}
+                  {kpi.tipo === 'check' && (
+                    <div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-emerald-600">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>Completado exitosamente</span>
+                    </div>
+                  )}
                 </motion.button>
               )
             })}
@@ -440,48 +462,39 @@ function AdminHeader({ onRefresh, onLogout }) {
   )
 }
 
-function BannerEjecutivo({ totalTickets, enProceso, onEscanear, onReporte }) {
+function BannerEjecutivo({ onEscanear, onReporte }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-3xl border border-green-600/10 bg-linear-to-br from-green-700 via-green-600 to-green-500 p-6 text-white shadow-[0_24px_48px_rgb(0,102,51,0.22)] sm:p-8"
-      aria-labelledby="banner-ejecutivo"
-    >
-      <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl" aria-hidden="true" />
-      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-green-300/20 blur-3xl" aria-hidden="true" />
-      <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-caption mb-2 text-green-100">Panel ejecutivo · SAIA-SIAD</p>
-          <h1 id="banner-ejecutivo" className="text-h1 text-white">
-            Gestion de Incidencias Administrativas
-          </h1>
-          <p className="mt-3 text-sm font-semibold leading-7 text-green-50">
-            Monitoreo en tiempo real de los tickets, asignacion de especialistas y validacion presencial
-            de atencion mediante codigo QR. Actualmente hay <span className="font-black underline decoration-green-300 decoration-2 underline-offset-2">{totalTickets}</span> tickets registrados y{' '}
-            <span className="font-black underline decoration-green-300 decoration-2 underline-offset-2">{enProceso}</span> en proceso de atencion.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
-          <motion.button
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 p-8 text-white shadow-2xl mb-8">
+      <div className="relative z-10">
+        <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-full text-xs font-semibold uppercase tracking-wider">
+          Panel de Control Central
+        </span>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
+          ¡Hola de nuevo, <span className="text-emerald-400">Admin</span>! 👋
+        </h1>
+        <p className="mt-2 max-w-2xl text-slate-300 text-sm leading-relaxed">
+          Bienvenido al centro operativo SAIA-SIAD. Supervisa las solicitudes de soporte en tiempo
+          real, escanea los comprobantes QR para validación presencial y gestiona la carga de trabajo
+          técnica.
+        </p>
+
+        {/* Accesos Rápidos Integrados */}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button
             onClick={onEscanear}
-            whileTap={{ scale: 0.97 }}
-            className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-black text-green-800 shadow-[0_8px_24px_rgb(0,0,0,0.15)] transition-all hover:bg-green-50"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 font-medium text-xs rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer"
           >
-            <ScanLine className="h-5 w-5" aria-hidden="true" />
-            Escanear Ticket QR
-          </motion.button>
-          <motion.button
+            📷 Escanear Ticket QR
+          </button>
+          <button
             onClick={onReporte}
-            whileTap={{ scale: 0.97 }}
-            className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-white/30 bg-white/10 px-6 py-3 text-sm font-black text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+            className="px-4 py-2 bg-white/10 hover:bg-white/20 font-medium text-xs rounded-lg backdrop-blur-sm transition-all cursor-pointer flex items-center gap-2"
           >
-            <FileDown className="h-5 w-5" aria-hidden="true" />
-            Descargar Reporte Diario
-          </motion.button>
+            📊 Descargar Reporte Diario
+          </button>
         </div>
       </div>
-    </motion.section>
+    </div>
   )
 }
 
@@ -605,7 +618,7 @@ function IngenieroDetail({ ingenieroId, tickets, loading, onSelectTicket, onBack
 }
 
 function TicketDetail({ ticket, onBack }) {
-  const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1').replace('/api/v1', '')
+  const API_BASE = (import.meta.env.VITE_API_URL || '').replace('/api/v1', '')
   const meta = ticket.metadata || {}
 
   return (

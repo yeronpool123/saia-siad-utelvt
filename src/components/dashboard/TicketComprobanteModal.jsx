@@ -80,7 +80,7 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
           exit="hidden"
         >
           <motion.div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50 backdrop-blur-md"
             variants={backdropVariants}
             onClick={onClose}
             aria-hidden="true"
@@ -104,7 +104,7 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                         <div className="text-white">
                           <p className="text-sm font-black tracking-wide">UTELVT</p>
                           <p className="text-[10px] font-bold text-green-100">Universidad Tecnica Luis Vargas Torres</p>
-                          <p className="text-[9px] font-semibold text-green-200">Direccion de Tecnologias de la Informacion</p>
+                          <p className="text-[9px] font-semibold text-green-200">SAIA-SIAD</p>
                         </div>
                       </div>
                       <div className="text-right text-white">
@@ -113,13 +113,11 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                       </div>
                     </div>
                   </div>
-
                   <div className="px-6 py-5">
                     <div className="mb-5 text-center">
                       <p className="text-caption mb-1 text-green-700">Cita confirmada</p>
                       <h2 id="ticket-title" className="text-h3 text-ink">Comprobante de Cita Asignada</h2>
                     </div>
-
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-[1fr_auto] sm:items-center">
                       <div className="space-y-4">
                         <DetailRow
@@ -139,8 +137,10 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                           value={ticket.hora}
                           subvalue={cedula ? `Cedula: ${cedula}` : ''}
                         />
+                        <div className="flex justify-center">
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-extrabold text-slate-600">PENDIENTE</span>
+                        </div>
                       </div>
-
                       <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-green-600/10 bg-white p-4 shadow-[0_8px_24px_rgb(0,102,51,0.08)]">
                         <div className="rounded-xl bg-white p-2 ring-2 ring-green-600/20">
                           <QRCodeCanvas
@@ -155,14 +155,12 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                       </div>
                     </div>
                   </div>
-
                   <div className="relative">
                     <div className="ticket-perforated h-5 border-y border-dashed border-green-600/30" />
                     <span className="absolute left-1/2 top-1/2 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-green-50 text-green-700">
                       <Scissors className="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
                   </div>
-
                   <div className="bg-green-50 px-6 py-4 text-center">
                     <p className="mx-auto max-w-xs text-[11px] font-bold leading-5 text-green-900">
                       Presente este comprobante el dia de su cita. En caso de requerimientos de reseteo,
@@ -171,8 +169,10 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                   </div>
                 </div>
               </div>
-
               <div className="border-t border-green-600/10 px-6 py-4">
+                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-800">
+                  <span className="text-amber-600">📌 Importante:</span> Por favor descarga tu ticket en formato JPG o toma una captura de pantalla clara. Deberás presentar el código QR de este comprobante el día de tu cita.
+                </div>
                 <AnimatePresence>
                   {descargado && (
                     <motion.div
@@ -188,7 +188,6 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                     </motion.div>
                   )}
                 </AnimatePresence>
-
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <motion.button
                     onClick={handleDownloadJpg}
@@ -204,7 +203,7 @@ export default function TicketComprobanteModal({ open, onClose, ticket }) {
                     ) : (
                       <>
                         <Image className="relative z-10 h-4 w-4" aria-hidden="true" />
-                        <span className="relative z-10">Descargar JPG</span>
+                        <span className="relative z-10">Descargar Ticket (.JPG)</span>
                       </>
                     )}
                   </motion.button>
