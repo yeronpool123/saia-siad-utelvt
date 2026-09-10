@@ -1,0 +1,290 @@
+// ============================================================
+// SAIA-SIAD — Esquema de Base de Datos (Prisma)
+// Sistema de Automatización de Identidad y Accesos — UTELVT
+// ============================================================
+// Este esquema fue diseñado para cubrir:
+//   • Gestión de usuarios con roles granulares
+//   • Tickets de soporte multi-tipo con seguimiento completo
+//   • Bitácora de auditoría (trazabilidad total)
+//   • Tokens de recuperación de contraseñas
+//   • Categorías y prioridades dinámicas para tickets
+//   • Comunicación interna por comentarios en tickets
+//   • Configuración del sistema en base de datos
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMERACIONES ───────────────────────────────────────
+
+enum Rol {
+  ESTUDIANTE
+  DOCENTE
+  ADMINISTRATIVO
+  SOPORTE_TI
+  SUPER_ADMIN
+  OTRO
+}
+
+enum EstadoTicket {
+  PENDIENTE
+  EN_PROCESO
+  ESPERANDO_RESPUESTA
+  RESUELTO
+  CERRADO
+  RECHAZADO
+  ATENDIDO
+}
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum TipoSoporte {
+  RESETEO_SIAD
+  RESETEO_CORREO
+  DESBLOQUEO_CUENTA
+  ACCESO_PLATAFORMA
+  PROBLEMA_EQUIPO
+  SOLICITUD_SOFTWARE
+  CONFIGURACION_RED
+  OTRO
+}
+
+enum CitaEstado {
+  ASIGNADA
+  EN_ATENCION
+  COMPLETADA
+  CANCELADA
+}
+
+enum AccionAuditoria {
+  // Acciones sobre usuarios
+  CREAR_USUARIO
+  ACTUALIZAR_USUARIO
+  ELIMINAR_USUARIO
+  CAMBIAR_PASSWORD
+
+  // Acciones sobre tickets
+  CREAR_TICKET
+  ACTUALIZAR_TICKET
+  CAMBIAR_ESTADO_TICKET
+  ASIGNAR_TICKET
+  ESCALAR_TICKET
+  CERRAR_TICKET
+  RECHAZAR_TICKET
+
+  // Acciones de autenticación
+  LOGIN_EXITOSO
+  LOGIN_FALLIDO
+  LOGOUT
+  TOKEN_REFRESH
+
+  // Acciones sobre comentarios
+  CREAR_COMENTARIO
+  ELIMINAR_COMENTARIO
+
+  // Acciones sobre configuración
+  ACTUALIZAR_CONFIG
+
+  // Acciones sobre tokens
+  SOLICITAR_RESET_PASSWORD
+  COMPLETAR_RESET_PASSWORD
+
+  // Otros
+  EXPORTAR_DATOS
+  ACCESO_NO_AUTORIZADO
+
+  // Citas personales
+  CREAR_CITA
+  CANCELAR_CITA
+  COMPLETAR_CITA
+}
+
+// ─── MODELO: ConfiguracionSistema ─────────────────────────
+// Almacena parámetros configurables del sistema en tiempo
+// de ejecución sin necesidad de redeploy.
+model ConfiguracionSistema {
+  id          String   @id @default(cuid())
+  clave       String   @unique
+  valor       String
+  descripcion String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("configuracion_sistema")
+}
+
+// ─── MODELO: Usuario ─────────────────────────────────────
+model Usuario {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  nombre        String
+  apellido      String?
+  cedula        String?   @unique
+  rol           Rol       @default(ESTUDIANTE)
+  telefono      String?
+  departamento  String?
+  facultad      String?
+  carrera       String?
+  cargo         String?
+  activo        Boolean   @default(true)
+  ultimoLogin   DateTime? @map("ultimo_login")
+  metadata      Json?
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt   @map("updated_at")
+
+  // Relaciones
+  ticketsCreados  Ticket[]     @relation("TicketsCreados")
+  ticketsAsignados Ticket[]    @relation("TicketsAsignados")
+  comentarios      Comentario[]
+  auditLogs        AuditLog[]
+  resetTokens      ResetToken[]
+
+  @@map("usuarios")
+}
+
+// ─── MODELO: CategoriaTicket ────────────────────────────
+model CategoriaTicket {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  activa      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tickets     Ticket[]
+
+  @@map("categorias_ticket")
+}
+
+// ─── MODELO: Ticket ─────────────────────────────────────
+model Ticket {
+  id              String        @id @default(cuid())
+  numero          String        @unique
+  titulo          String
+  descripcion     String        @db.Text
+  tipo            TipoSoporte
+  prioridad       Prioridad     @default(MEDIA)
+  estado          EstadoTicket  @default(PENDIENTE)
+
+  // Relaciones
+  userId          String
+  usuario         Usuario       @relation("TicketsCreados", fields: [userId], references: [id])
+  asignadoAId     String?
+  asignadoA       Usuario?      @relation("TicketsAsignados", fields: [asignadoAId], references: [id])
+  categoriaId     String?
+  categoria       CategoriaTicket? @relation(fields: [categoriaId], references: [id])
+
+  // Resolución
+  resolucion      String?       @db.Text
+  resueltoEn      DateTime?     @map("resuelto_en")
+
+  // Trazabilidad temporal
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt  @map("updated_at")
+  respuestaEn     DateTime?     @map("respuesta_en")
+  cerradoEn       DateTime?     @map("cerrado_en")
+  atendidoEn      DateTime?     @map("atendido_en")
+
+  // Metadatos adicionales
+  adjuntos        Json?
+  metadata        Json?
+  fotoCedulaUrl   String?
+
+  // Relaciones adicionales
+  comentarios     Comentario[]
+  auditLogs       AuditLog[]
+  citaPersonal    CitaPersonal?
+
+  @@index([userId])
+  @@index([estado])
+  @@index([prioridad])
+  @@index([tipo])
+  @@index([asignadoAId])
+  @@map("tickets")
+}
+
+// ─── MODELO: Comentario ─────────────────────────────────
+model Comentario {
+  id        String   @id @default(cuid())
+  contenido String  @db.Text
+  interno   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  userId    String
+  usuario   Usuario  @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+  @@index([userId])
+  @@map("comentarios")
+}
+
+// ─── MODELO: AuditLog ───────────────────────────────────
+model AuditLog {
+  id          String          @id @default(cuid())
+  accion      AccionAuditoria
+  detalles    String?        @db.Text
+  ipAddress   String?        @map("ip_address")
+  userAgent   String?        @db.Text
+  datosPrevios Json?         @map("datos_previos")
+  datosNuevos  Json?         @map("datos_nuevos")
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  userId      String?
+  usuario     Usuario?       @relation(fields: [userId], references: [id])
+  ticketId    String?
+  ticket      Ticket?        @relation(fields: [ticketId], references: [id])
+
+  @@index([userId])
+  @@index([ticketId])
+  @@index([accion])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── MODELO: ResetToken ─────────────────────────────────
+model ResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiraEn  DateTime @map("expira_en")
+  usado     Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId    String
+  usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([expiraEn])
+  @@map("reset_tokens")
+}
+
+// ─── MODELO: CitaPersonal ────────────────────────────────
+// Almacena las citas de atencion presencial con ingenieros de TICS.
+model CitaPersonal {
+  id              String      @id @default(cuid())
+  ingenieroNombre String
+  ingenieroId     String
+  fechaAsignada   DateTime    @map("fecha_asignada")
+  horaAsignada    String      @map("hora_asignada")
+  estado          CitaEstado  @default(ASIGNADA)
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  ticketId        String      @unique
+  ticket          Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ingenieroId])
+  @@index([estado])
+  @@map("citas_personales")
+}

@@ -1,0 +1,46 @@
+{
+  "name": "saia-siad-backend",
+  "version": "1.0.0",
+  "description": "Backend del Sistema de Automatización de Identidad y Accesos (SAIA-SIAD) - UTELVT",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon --exec npx tsx src/index.js",
+    "start": "npx tsx src/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:prod": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "npx tsx prisma/seed.js",
+    "test": "echo \"Error: no test specified yet\" && exit 1"
+  },
+  "keywords": [
+    "saia",
+    "siad",
+    "utelvt",
+    "identity",
+    "access",
+    "automation"
+  ],
+  "author": "SAIA-SIAD Team - UTELVT",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "helmet": "^8.2.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "pg": "^8.22.0",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "nodemon": "^3.1.14",
+    "prisma": "^7.8.0",
+    "tsx": "^4.22.4"
+  }
+}

@@ -1,0 +1,36 @@
+:root {
+  --green-utelvt: #006633;
+  --green-900: #002b15;
+  --green-800: #00401f;
+  --green-700: #005328;
+  --green-600: #006633;
+  --green-500: #00854a;
+  --green-400: #2da866;
+  --green-300: #66cc99;
+  --green-200: #b3e0c6;
+  --green-100: #e8f5ee;
+  --green-50: #f5fbf8;
+
+  --white: #ffffff;
+  --gray-50: #f8faf9;
+  --gray-100: #f1f4f3;
+  --gray-200: #e2e8e5;
+  --gray-400: #94a3a0;
+  --gray-600: #4a5560;
+  --gray-800: #1a2520;
+  --ink: #0a1f14;
+
+  --grad-primary: linear-gradient(135deg, #006633 0%, #00854a 52%, #2da866 100%);
+  --grad-soft: linear-gradient(135deg, #ffffff 0%, #f8faf9 52%, #e8f5ee 100%);
+  --grad-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 249, 0.88) 100%);
+  --grad-hero: radial-gradient(ellipse at top, #e8f5ee 0%, #ffffff 58%);
+  --grad-text: linear-gradient(90deg, #006633, #2da866, #006633);
+
+  --shadow-sm: 0 1px 2px rgba(0, 102, 51, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 102, 51, 0.10);
+  --shadow-lg: 0 12px 32px rgba(0, 102, 51, 0.15);
+  --shadow-glow: 0 0 24px rgba(45, 168, 102, 0.35);
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+}

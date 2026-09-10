@@ -1,0 +1,75 @@
+{
+  "name": "SAIA-SIAD — Ticket creado",
+  "nodes": [
+    {
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 300],
+      "parameters": {
+        "path": "saia-ticket",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson",
+        "options": {}
+      },
+      "webhookId": null
+    },
+    {
+      "id": "sheets-1",
+      "name": "Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [350, 300],
+      "parameters": {
+        "operation": "append",
+        "sheetId": "",
+        "range": "Sheet1!A:E",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": [
+            { "column": "A", "sourceColumn": "fecha" },
+            { "column": "B", "sourceColumn": "nombres" },
+            { "column": "C", "sourceColumn": "cedula" },
+            { "column": "D", "sourceColumn": "requerimiento" },
+            { "column": "E", "sourceColumn": "descripcion" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "email-1",
+      "name": "Enviar Correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "fromEmail": "soporte@utelvt.edu.ec",
+        "toEmail": "ti@utelvt.edu.ec",
+        "subject": "Nuevo ticket SAIA-SIAD: {{ $json.requerimiento }}",
+        "text": "Se ha creado un nuevo ticket:\n\nFecha: {{ $json.fecha }}\nNombres: {{ $json.nombres }}\nCedula: {{ $json.cedula }}\nRequerimiento: {{ $json.requerimiento }}\nDescripcion: {{ $json.descripcion }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Google Sheets", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [{ "node": "Enviar Correo", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0,
+  "active": false,
+  "tags": []
+}

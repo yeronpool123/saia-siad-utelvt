@@ -1,0 +1,185 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap");
+@import "./styles/tokens.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --color-green-50: #f5fbf8;
+  --color-green-100: #e8f5ee;
+  --color-green-200: #b3e0c6;
+  --color-green-300: #66cc99;
+  --color-green-400: #2da866;
+  --color-green-500: #00854a;
+  --color-green-600: #006633;
+  --color-green-700: #005328;
+  --color-green-800: #00401f;
+  --color-green-900: #002b15;
+  --color-ink: #0a1f14;
+  --animate-shimmer: shimmer-text 4s linear infinite;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: auto;
+  }
+
+  body {
+    @apply min-h-screen bg-white text-ink;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  button:focus-visible {
+    @apply outline-2 outline-offset-2 outline-green-400;
+  }
+
+  h1,
+  h2,
+  h3,
+  label,
+  button {
+    font-weight: 700;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: var(--grad-glass);
+    box-shadow: var(--shadow-md);
+    @apply border border-green-600/10 backdrop-blur-2xl;
+  }
+
+  .text-grad-animate {
+    background: var(--grad-text);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer-text 4s linear infinite;
+  }
+
+  .btn-primary {
+    @apply relative min-h-12 cursor-pointer overflow-hidden rounded-xl bg-linear-to-br from-green-600 to-green-400 px-6 py-3 font-extrabold text-white shadow-[0_12px_32px_rgb(0,102,51,0.18)] transition-shadow hover:shadow-[0_0_24px_rgb(45,168,102,0.35)] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary::before {
+    content: "";
+    @apply absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/25 to-transparent transition-transform duration-700;
+  }
+
+  .btn-primary:hover::before {
+    @apply translate-x-full;
+  }
+
+  .btn-secondary {
+    @apply min-h-12 cursor-pointer rounded-xl border border-green-600/15 bg-white px-6 py-3 font-extrabold text-green-700 shadow-[0_8px_30px_rgb(0,102,51,0.06)] transition-colors hover:bg-green-50;
+  }
+
+  .field {
+    @apply min-h-12 w-full rounded-xl border border-green-600/15 bg-white px-4 py-3 font-semibold text-ink shadow-sm transition-colors placeholder:font-semibold placeholder:text-slate-400 focus:border-green-400;
+  }
+
+  .spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+    background: radial-gradient(
+      600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(45, 168, 102, 0.06),
+      transparent 40%
+    );
+  }
+
+  .spotlight-card:hover::before {
+    opacity: 1;
+  }
+
+  .text-display {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 5vw, 4.5rem);
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .text-h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .text-h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .text-h3 {
+    font-family: var(--font-display);
+    font-size: clamp(1.12rem, 2vw, 1.5rem);
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .text-caption {
+    @apply text-xs font-bold uppercase tracking-[0.14em];
+  }
+
+  .typewriter-cursor {
+    display: inline-block;
+    width: 2px;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    background: var(--green-utelvt);
+    color: transparent;
+    animation: blink-cursor 500ms step-end infinite;
+  }
+
+  .typewriter-target {
+    min-height: 1.4em;
+    display: inline-block;
+  }
+
+  .ticket-perforated {
+    background-color: #ffffff;
+    background-image: radial-gradient(circle at center, #e6f4ec 0 3px, #ffffff 3.5px);
+    background-size: 18px 100%;
+    background-repeat: repeat-x;
+  }
+}
+
+@keyframes blink-cursor {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer-text {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
