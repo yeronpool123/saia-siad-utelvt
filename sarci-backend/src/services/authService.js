@@ -4,20 +4,25 @@ import { auditLog } from '../middlewares/audit.js';
 import config from '../config/app.js';
 
 export const login = async ({ email, password, req }) => {
-  const usuario = await prisma.usuario.findUnique({ where: { email } });
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+  const usuario = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
 
   if (!usuario) {
-    await auditLog({ userId: null, accion: 'LOGIN_FALLIDO', detalles: `Email no encontrado: ${email}`, req });
+    console.log(`[LOGIN ERROR] Usuario no encontrado con email: "${cleanEmail}"`);
+    await auditLog({ userId: null, accion: 'LOGIN_FALLIDO', detalles: `Email no encontrado: ${cleanEmail}`, req });
     throw { statusCode: 401, message: 'Credenciales inválidas' };
   }
 
   if (!usuario.activo) {
+    console.log(`[LOGIN ERROR] Usuario desactivado: "${cleanEmail}"`);
     await auditLog({ userId: usuario.id, accion: 'LOGIN_FALLIDO', detalles: 'Cuenta desactivada', req });
     throw { statusCode: 403, message: 'Cuenta desactivada. Contacte al administrador.' };
   }
 
   const passwordMatch = await comparePassword(password, usuario.passwordHash);
   if (!passwordMatch) {
+    console.log(`[LOGIN ERROR] Contraseña incorrecta para: "${cleanEmail}"`);
     await auditLog({ userId: usuario.id, accion: 'LOGIN_FALLIDO', detalles: 'Contraseña incorrecta', req });
     throw { statusCode: 401, message: 'Credenciales inválidas' };
   }
@@ -40,7 +45,8 @@ export const login = async ({ email, password, req }) => {
 };
 
 export const register = async ({ email, password, nombre, apellido, cedula, rol, telefono, departamento, facultad, carrera, cargo, req }) => {
-  const existing = await prisma.usuario.findUnique({ where: { email } });
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const existing = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
   if (existing) {
     throw { statusCode: 409, message: 'Ya existe un usuario con ese email' };
   }
@@ -56,7 +62,7 @@ export const register = async ({ email, password, nombre, apellido, cedula, rol,
 
   const usuario = await prisma.usuario.create({
     data: {
-      email, passwordHash, nombre, apellido, cedula,
+      email: cleanEmail, passwordHash, nombre, apellido, cedula,
       rol: rol || 'ESTUDIANTE', telefono, departamento,
       facultad, carrera, cargo,
     },
@@ -65,7 +71,7 @@ export const register = async ({ email, password, nombre, apellido, cedula, rol,
   const { passwordHash: _, ...userSafe } = usuario;
   const payload = { userId: usuario.id, email: usuario.email, rol: usuario.rol };
 
-  await auditLog({ userId: usuario.id, accion: 'CREAR_USUARIO', detalles: `Usuario creado: ${email}`, req, datosNuevos: userSafe });
+  await auditLog({ userId: usuario.id, accion: 'CREAR_USUARIO', detalles: `Usuario creado: ${cleanEmail}`, req, datosNuevos: userSafe });
 
   return {
     user: userSafe,
@@ -95,7 +101,8 @@ export const refreshToken = async ({ refreshToken: token, req }) => {
 };
 
 export const forgotPassword = async ({ email, req }) => {
-  const usuario = await prisma.usuario.findUnique({ where: { email } });
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const usuario = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
   if (!usuario) {
     return { message: 'Si el email existe, se enviará un correo de recuperación.' };
   }
@@ -107,7 +114,7 @@ export const forgotPassword = async ({ email, req }) => {
 
   const token = generateResetToken();
   const expiraEn = new Date();
-  expiraEn.setHours(expiraEn.getHours() + parseInt(config.resetToken.expiresIn, 10) || 1);
+  expiraEn.setHours(expiraEn.getHours() + (parseInt(config.resetToken.expiresIn, 10) || 1));
 
   await prisma.resetToken.create({
     data: { token, expiraEn, userId: usuario.id },

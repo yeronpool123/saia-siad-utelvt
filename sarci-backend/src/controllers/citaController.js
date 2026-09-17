@@ -3,6 +3,7 @@ import { success, badRequest, notFound, conflict } from '../utils/response.js';
 import { auditLog } from '../middlewares/audit.js';
 import { generateQrPayload } from '../utils/qrToken.js';
 import { emitTicketEvent } from '../config/socket.js';
+import { getRosterIngenieros, resolverIngeniero, autoAsignarIngeniero } from '../services/citaService.js';
 import {
   INGENIEROS,
   BLOQUES_HORARIOS,
@@ -45,8 +46,10 @@ const contarCitas = async ({ fecha, hora, ingenieroId = null }) => {
 export const getIngenieros = async (req, res) => {
   const { fecha, hora } = req.query;
 
+  const roster = await getRosterIngenieros();
+
   const ingenierosConConteo = await Promise.all(
-    INGENIEROS.map(async (ingeniero) => {
+    roster.map(async (ingeniero) => {
       const [count, countPorHora] = await Promise.all([
         prisma.citaPersonal.count({
           where: {
@@ -82,7 +85,7 @@ export const getHorariosDisponibles = async (req, res) => {
     return badRequest(res, 'Se requiere ingenieroId y fecha');
   }
 
-  const ingeniero = INGENIEROS.find((i) => i.id === ingenieroId);
+  const ingeniero = await resolverIngeniero(ingenieroId);
   if (!ingeniero) {
     return notFound(res, 'Ingeniero no encontrado');
   }
@@ -173,8 +176,8 @@ export const getDisponibilidad = async (req, res) => {
 export const crearCita = async (req, res) => {
   const { ticketId, ingenieroId, fecha, hora } = req.body;
 
-  if (!ticketId || !ingenieroId || !fecha || !hora) {
-    return badRequest(res, 'Se requiere ticketId, ingenieroId, fecha y hora');
+  if (!ticketId || !fecha || !hora) {
+    return badRequest(res, 'Se requiere ticketId, fecha y hora');
   }
 
   if (!esDiaLaborable(fecha)) {
@@ -186,9 +189,12 @@ export const crearCita = async (req, res) => {
     return badRequest(res, `El bloque horario "${hora}" no es válido. Use el formato HH:mm AM/PM (ej. 08:00 AM - 09:00 AM).`);
   }
 
-  const ingeniero = INGENIEROS.find((i) => i.id === ingenieroId);
-  if (!ingeniero) {
-    return notFound(res, 'Ingeniero no encontrado');
+  let ingeniero = null;
+  if (ingenieroId) {
+    ingeniero = await resolverIngeniero(ingenieroId);
+    if (!ingeniero) {
+      return notFound(res, 'Ingeniero no encontrado');
+    }
   }
 
   const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
@@ -203,7 +209,9 @@ export const crearCita = async (req, res) => {
 
   const { inicioDia, finDia } = dayRange(fecha);
 
-  const [ocupadasGlobal, ocupadasIngeniero] = await Promise.all([
+  const capacidadGlobal = getCapacidadBloque(hora);
+  const capacidadIngeniero = getCapacidadIngenieroParaBloque(hora);
+  const [ocupadasGlobal, ocupadasIngenieroSeleccion] = await Promise.all([
     prisma.citaPersonal.count({
       where: {
         fechaAsignada: { gte: inicioDia, lte: finDia },
@@ -211,30 +219,49 @@ export const crearCita = async (req, res) => {
         estado: { in: ['ASIGNADA', 'EN_ATENCION'] },
       },
     }),
-    prisma.citaPersonal.count({
-      where: {
-        ingenieroId,
-        fechaAsignada: { gte: inicioDia, lte: finDia },
-        horaAsignada: hora,
-        estado: { in: ['ASIGNADA', 'EN_ATENCION'] },
-      },
-    }),
+    ingenieroId
+      ? prisma.citaPersonal.count({
+          where: {
+            ingenieroId,
+            fechaAsignada: { gte: inicioDia, lte: finDia },
+            horaAsignada: hora,
+            estado: { in: ['ASIGNADA', 'EN_ATENCION'] },
+          },
+        })
+      : Promise.resolve(0),
   ]);
 
-  const capacidadGlobal = getCapacidadBloque(hora);
   if (ocupadasGlobal >= capacidadGlobal) {
     return conflict(res, `El bloque ${hora} ha completado su aforo de ${capacidadGlobal} ticket(s). Por favor, selecciona otro horario.`);
   }
 
-  const capacidadIngeniero = getCapacidadIngenieroParaBloque(hora);
-  if (ocupadasIngeniero >= capacidadIngeniero) {
+  if (ingenieroId && ocupadasIngenieroSeleccion >= capacidadIngeniero) {
     return conflict(res, 'El especialista seleccionado ha completado su aforo para este horario. Por favor, selecciona otro especialista u otro bloque de tiempo.');
+  }
+
+  let autoAsignado = null;
+  if (!ingenieroId) {
+    autoAsignado = await autoAsignarIngeniero({
+      fecha,
+      hora,
+      limitePorHora: capacidadIngeniero,
+    });
+
+    if (!autoAsignado) {
+      return conflict(res, 'El bloque horario seleccionado está completamente lleno. Por favor elija otra hora.');
+    }
+
+    ingeniero = {
+      id: autoAsignado.id,
+      nombre: autoAsignado.nombre,
+      especialidad: autoAsignado.especialidad,
+    };
   }
 
   const cita = await prisma.citaPersonal.create({
     data: {
       ingenieroNombre: ingeniero.nombre,
-      ingenieroId,
+      ingenieroId: ingeniero.id,
       fechaAsignada: inicioDia,
       horaAsignada: hora,
       ticketId,
@@ -250,9 +277,9 @@ export const crearCita = async (req, res) => {
     userId: req.user.id,
     accion: 'CREAR_CITA',
     ticketId,
-    detalles: `Cita creada: ${ingeniero.nombre} - ${fecha} ${hora}`,
+    detalles: `Cita creada: ${ingeniero.nombre} - ${fecha} ${hora}${autoAsignado ? ' (asignacion automatica)' : ''}`,
     req,
-    datosNuevos: { ingenieroId, fecha, hora },
+    datosNuevos: { ingenieroId: ingeniero.id, fecha, hora, asignacionAutomatica: Boolean(autoAsignado) },
   });
 
   const cedula = ticket.metadata?.cedula || ticket.cedula || (await prisma.usuario.findUnique({ where: { id: ticket.userId } }))?.cedula || '';
@@ -263,10 +290,15 @@ export const crearCita = async (req, res) => {
     cedula,
   });
 
+  const usuarioSolicitante = await prisma.usuario.findUnique({
+    where: { id: ticket.userId },
+    select: { nombre: true, apellido: true },
+  });
+
   emitTicketEvent('cita:creada', {
     ticketId: ticket.id,
     numero: ticket.numero,
-    ingenieroId,
+    ingenieroId: ingeniero.id,
     fecha,
     hora,
   });
@@ -276,6 +308,8 @@ export const crearCita = async (req, res) => {
     cita,
     ticketDigital: {
       codigo: ticket.numero,
+      motivo: ticket.titulo || ticket.metadata?.motivoSolicitud || '',
+      usuario: [usuarioSolicitante?.nombre, usuarioSolicitante?.apellido].filter(Boolean).join(' ') || '',
       ingeniero: ingeniero.nombre,
       especialidad: ingeniero.especialidad,
       fecha,

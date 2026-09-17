@@ -13,6 +13,7 @@ import PulseIcon from "../animations/PulseIcon";
 import SpotlightCard from "../ui/SpotlightCard";
 import RequestForm from "./RequestForm";
 import HelpModal from "./HelpModal";
+import UserTicketStatus from "./UserTicketStatus";
 import { SPRING } from "../../lib/motion";
 
 function getGreetingName(nombre = "", apellido = "") {
@@ -193,6 +194,8 @@ const Dashboard = memo(function Dashboard({ user, onSubmitRequest, onInterceptSu
       )}
 
       <RequestForm user={user} onSubmit={handleSubmit} onInterceptSubmit={onInterceptSubmit} />
+
+      <UserTicketStatus user={user} />
 
       <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>

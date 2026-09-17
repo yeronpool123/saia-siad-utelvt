@@ -111,11 +111,43 @@ if (process.env.NODE_ENV === 'production') {
   app.use(vite.middlewares);
 }
 
-server.listen(PORT, '0.0.0.0', () => {
+const PUERTOS_MAXIMOS = 10;
+const puertoBase = PORT;
+let puertoActual = puertoBase;
+let arrancado = false;
+
+const reportarInicio = () => {
   console.log('═══════════════════════════════════════════════════');
   console.log('  SAIA-SIAD UTELVT - Sistema Completo Iniciado');
-  console.log(`  URL      : http://0.0.0.0:${PORT}`);
-  console.log(`  API Base : http://0.0.0.0:${PORT}/api/v1`);
-  console.log(`  Health   : http://0.0.0.0:${PORT}/api/health`);
+  console.log(`  URL      : http://0.0.0.0:${puertoActual}`);
+  console.log(`  API Base : http://0.0.0.0:${puertoActual}/api/v1`);
+  console.log(`  Health   : http://0.0.0.0:${puertoActual}/api/health`);
   console.log('═══════════════════════════════════════════════════');
+  if (puertoActual !== puertoBase) {
+    console.warn(`Nota: el puerto ${puertoBase} estaba ocupado; el sistema quedó en el puerto ${puertoActual}.`);
+  }
+};
+
+server.on('listening', () => {
+  if (arrancado) return;
+  arrancado = true;
+  reportarInicio();
 });
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    if (puertoActual >= puertoBase + PUERTOS_MAXIMOS - 1) {
+      console.error(`Error: el puerto ${puertoActual} está ocupado y no se encontró libre entre ${puertoBase} y ${puertoActual}.`);
+      console.error('Detenga el proceso que está usando el puerto o cambie PORT en el archivo .env.');
+      process.exit(1);
+    }
+    puertoActual += 1;
+    console.warn(`Puerto ${puertoActual - 1} en uso; el sistema quedará en el puerto ${puertoActual}...`);
+    server.listen(puertoActual, '0.0.0.0');
+    return;
+  }
+  console.error('Error al iniciar el servidor:', err.message);
+  process.exit(1);
+});
+
+server.listen(puertoActual, '0.0.0.0');

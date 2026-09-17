@@ -17,3 +17,9 @@ Thumbs.db
 /generated/prisma
 uploads/cedulas/*
 !uploads/cedulas/.gitkeep
+
+/storage/face_models/*
+!/storage/face_models/.gitkeep
+
+/storage/face_id/*
+!/storage/face_id/.gitkeep

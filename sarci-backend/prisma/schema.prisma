@@ -12,14 +12,15 @@
 //   • Configuración del sistema en base de datos
 // ============================================================
 
+
+// AHORA (Correcto para Prisma 7 + PostgreSQL):
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
 }
 
 // ─── ENUMERACIONES ───────────────────────────────────────
@@ -41,6 +42,8 @@ enum EstadoTicket {
   CERRADO
   RECHAZADO
   ATENDIDO
+  CASO_ESPECIAL
+  CANCELADO_USUARIO
 }
 
 enum Prioridad {
@@ -83,6 +86,7 @@ enum AccionAuditoria {
   ESCALAR_TICKET
   CERRAR_TICKET
   RECHAZAR_TICKET
+  CANCELAR_TICKET
 
   // Acciones de autenticación
   LOGIN_EXITOSO
@@ -148,6 +152,7 @@ model Usuario {
   ticketsCreados  Ticket[]     @relation("TicketsCreados")
   ticketsAsignados Ticket[]    @relation("TicketsAsignados")
   comentarios      Comentario[]
+  chatMessages     ChatMessage[] @relation("ChatMessagesEnviados")
   auditLogs        AuditLog[]
   resetTokens      ResetToken[]
 
@@ -189,6 +194,10 @@ model Ticket {
   resolucion      String?       @db.Text
   resueltoEn      DateTime?     @map("resuelto_en")
 
+  // Cancelación y casos especiales
+  cancellationReason String?    @db.Text     @map("cancellation_reason")
+  isSpecialCase  Boolean        @default(false) @map("is_special_case")
+
   // Trazabilidad temporal
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt  @map("updated_at")
@@ -205,6 +214,7 @@ model Ticket {
   comentarios     Comentario[]
   auditLogs       AuditLog[]
   citaPersonal    CitaPersonal?
+  messages        ChatMessage[]
 
   @@index([userId])
   @@index([estado])
@@ -212,6 +222,26 @@ model Ticket {
   @@index([tipo])
   @@index([asignadoAId])
   @@map("tickets")
+}
+
+// ─── MODELO: ChatMessage ───────────────────────────────
+// Mensajes del chat bidireccional en tiempo real (Socket.IO),
+// entregados en salas aisladas por ticketId.
+model ChatMessage {
+  id          String   @id @default(cuid())
+  message     String   @db.Text
+  attachments Json?
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  senderId    String
+  sender      Usuario  @relation("ChatMessagesEnviados", fields: [senderId], references: [id])
+
+  @@index([ticketId, createdAt])
+  @@map("chat_messages")
 }
 
 // ─── MODELO: Comentario ─────────────────────────────────

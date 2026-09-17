@@ -1,6 +1,23 @@
 import prisma from '../config/db.js';
 import { success, badRequest, notFound } from '../utils/response.js';
 
+export const uploadChat = async (req, res) => {
+  if (!req.file) {
+    return badRequest(res, 'No se adjunto ningun archivo. Formato permitido: JPG, PNG, WebP, PDF. Maximo 5 MB.');
+  }
+
+  const urlRelativa = `/uploads/chat/${req.file.filename}`;
+  const urlAbsoluta = `${req.protocol}://${req.get('host')}${urlRelativa}`;
+
+  return success(res, 200, 'Adjunto subido exitosamente', {
+    url: urlAbsoluta,
+    relativeUrl: urlRelativa,
+    fileName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    size: req.file.size,
+  });
+};
+
 export const uploadCedula = async (req, res) => {
   if (!req.file) {
     return badRequest(res, 'No se adjunto ningun archivo. Formato permitido: JPG, PNG, WebP. Maximo 5 MB.');

@@ -22,6 +22,7 @@ import auditRoutes from './routes/audit.js';
 import uploadRoutes from './routes/upload.js';
 import citaRoutes from './routes/citas.js';
 import adminRoutes from './routes/admin.js';
+import { preloadAdminDescriptors } from './services/faceIdService.js';
 
 const app = express();
 const server = http.createServer(app);
@@ -84,17 +85,59 @@ const startServer = async () => {
     await prisma.$connect();
     console.log('Conexión a PostgreSQL establecida');
 
+    try {
+      await preloadAdminDescriptors();
+    } catch (err) {
+      console.error('[FACE ID] No se pudieron precargar los descriptores de administradores:', err.message);
+    }
+
     initSocket(server);
 
-    server.listen(config.port, () => {
+    const PUERTOS_MAXIMOS = 10;
+    const puertoBase = config.port;
+    let puertoActual = puertoBase;
+    let arrancado = false;
+
+    const reportarInicio = (puerto) => {
       console.log('═══════════════════════════════════════════════════');
       console.log('  SAIA-SIAD Backend — Servidor iniciado');
       console.log(`  Ambiente : ${config.nodeEnv.toUpperCase()}`);
-      console.log(`  URL      : http://localhost:${config.port}`);
-      console.log(`  API Base : http://localhost:${config.port}${config.api.basePath}`);
-      console.log(`  Health   : http://localhost:${config.port}/api/health`);
+      console.log(`  URL      : http://localhost:${puerto}`);
+      console.log(`  API Base : http://localhost:${puerto}${config.api.basePath}`);
+      console.log(`  Health   : http://localhost:${puerto}/api/health`);
       console.log('═══════════════════════════════════════════════════');
+      if (puerto !== puertoBase) {
+        console.warn(`Aviso: el puerto ${puertoBase} estaba ocupado; el backend quedó en el puerto ${puerto}.`);
+      }
+    };
+
+    const intentarEscuchar = () => {
+      server.listen(puertoActual);
+    };
+
+    server.on('listening', () => {
+      if (arrancado) return;
+      arrancado = true;
+      reportarInicio(puertoActual);
     });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        if (puertoActual >= puertoBase + PUERTOS_MAXIMOS - 1) {
+          console.error(`Error: el puerto ${puertoActual} está ocupado y no se encontró libre entre ${puertoBase} y ${puertoActual}.`);
+          console.error('Detenga el proceso que está usando el puerto o cambie PORT en sarci-backend/.env.');
+          process.exit(1);
+        }
+        puertoActual += 1;
+        console.warn(`Puerto en uso (${puertoActual - 1}); reintentando en el puerto ${puertoActual}...`);
+        intentarEscuchar();
+        return;
+      }
+      console.error('Error al iniciar:', err.message);
+      process.exit(1);
+    });
+
+    intentarEscuchar();
   } catch (err) {
     console.error('Error al iniciar:', err.message);
     process.exit(1);

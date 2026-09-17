@@ -51,6 +51,26 @@ export const changeStatus = async (req, res, next) => {
   }
 };
 
+export const cancelByUser = async (req, res, next) => {
+  try {
+    const result = await ticketService.cancelByUser({ id: req.params.id, ...req.body, userId: req.user.id, req });
+    success(res, 200, 'Solicitud cancelada exitosamente', result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, status: err.statusCode, message: err.message });
+    next(err);
+  }
+};
+
+export const getMessages = async (req, res, next) => {
+  try {
+    const result = await ticketService.getMessages({ ticketId: req.params.id, userId: req.user.id, rol: req.user.rol });
+    success(res, 200, 'Mensajes del ticket obtenidos', result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ success: false, status: err.statusCode, message: err.message });
+    next(err);
+  }
+};
+
 export const deleteTicket = async (req, res, next) => {
   try {
     const result = await ticketService.deleteTicket({ id: req.params.id, userId: req.user.id, rol: req.user.rol, req });
@@ -74,6 +94,21 @@ export const addComment = async (req, res, next) => {
 export const verifyQr = async (req, res, next) => {
   try {
     const result = await ticketService.verifyQr({ payload: req.body.payload, userId: req.user.id, req });
+    success(res, 200, 'Ticket validado y marcado como ATENDIDO', result);
+  } catch (err) {
+    if (err.statusCode) {
+      const body = { success: false, status: err.statusCode, message: err.message };
+      if (err.code) body.code = err.code;
+      if (err.data) body.data = err.data;
+      return res.status(err.statusCode).json(body);
+    }
+    next(err);
+  }
+};
+
+export const validarPorCodigo = async (req, res, next) => {
+  try {
+    const result = await ticketService.validarPorCodigo({ codigo: req.params.code, userId: req.user.id, req });
     success(res, 200, 'Ticket validado y marcado como ATENDIDO', result);
   } catch (err) {
     if (err.statusCode) {

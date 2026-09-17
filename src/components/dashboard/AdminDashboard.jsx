@@ -20,13 +20,17 @@ import {
   ShieldCheck,
   User,
   Users,
+  XCircle,
 } from 'lucide-react'
 import { io } from 'socket.io-client'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import SaiaLogo from '../brand/SaiaLogo'
 import SpotlightCard from '../ui/SpotlightCard'
 import ValidarQRView from './ValidarQRView'
+import TicketChat from './TicketChat'
 import { api } from '../../lib/api'
-import { socketUrl, ROL_LABEL } from '../../lib/institucional'
+import { socketUrl, ROL_LABEL, ESTADOS_FINALES } from '../../lib/institucional'
 import { SPRING } from '../../lib/motion'
 
 const FOTO_PATHS = {
@@ -43,6 +47,8 @@ const ESTADO_META = {
   RECHAZADO: { label: 'Rechazado', cls: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
   CERRADO: { label: 'Cerrado', cls: 'bg-slate-100 text-slate-700', dot: 'bg-slate-400' },
   ESPERANDO_RESPUESTA: { label: 'En espera', cls: 'bg-purple-100 text-purple-800', dot: 'bg-purple-500' },
+  CASO_ESPECIAL: { label: 'Caso especial', cls: 'bg-amber-100 text-amber-800', dot: 'bg-amber-500' },
+  CANCELADO_USUARIO: { label: 'Cancelado', cls: 'bg-rose-100 text-rose-800', dot: 'bg-rose-500' },
 }
 
 const ESTADO_LABEL = (estado) => ESTADO_META[estado]?.label || estado?.replace(/_/g, ' ') || '—'
@@ -65,13 +71,16 @@ export default function AdminDashboard({ user, onLogout }) {
   const [buscar, setBuscar] = useState('')
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [selectedEngineer, setSelectedEngineer] = useState(null)
+  const [selectedIngeniero, setSelectedIngeniero] = useState(null)
   const [engineerTickets, setEngineerTickets] = useState([])
   const [engineerLoading, setEngineerLoading] = useState(false)
   const [view, setView] = useState('dashboard')
   const [notificacion, setNotificacion] = useState(null)
   const notifTimer = useRef(null)
+  const ticketsRef = useRef([])
 
   const greeting = getGreetingName(user.nombre, user.apellido)
+  const nombreCompleto = [user?.nombre, user?.apellido].filter(Boolean).join(' ') || 'Admin'
 
   const notificar = useCallback((mensaje, tipo = 'ok') => {
     setNotificacion({ mensaje, tipo })
@@ -98,9 +107,11 @@ export default function AdminDashboard({ user, onLogout }) {
       if (filtroEstado) params.set('estado', filtroEstado)
       if (buscar.trim()) params.set('buscar', buscar.trim())
       const res = await api.get(`/admin/tickets?${params.toString()}`)
-      setTickets(res.data.data || [])
+      setTickets(res.data || [])
+      ticketsRef.current = res.data || []
     } catch {
       setTickets([])
+      ticketsRef.current = []
     } finally {
       setTicketsLoading(false)
     }
@@ -121,7 +132,7 @@ export default function AdminDashboard({ user, onLogout }) {
   }, [])
 
   useEffect(() => {
-    const socket = io(socketUrl(), { transports: ['websocket'] })
+    const socket = io(socketUrl(), { transports: ['websocket', 'polling'], reconnectionAttempts: 5, auth: { token: localStorage.getItem('token') || '' } })
     const onRefresh = (payload) => {
       fetchDashboard()
       if (!selectedEngineer) fetchTickets()
@@ -145,10 +156,12 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const handleSelectEngineer = async (ingenieroId) => {
     setSelectedEngineer(ingenieroId)
+    setSelectedIngeniero(null)
     setEngineerLoading(true)
     try {
       const res = await api.get(`/admin/tickets/ingeniero/${ingenieroId}`)
       setEngineerTickets(res.data.tickets)
+      setSelectedIngeniero(res.data.ingeniero)
     } catch {
       setEngineerTickets([])
     } finally {
@@ -163,41 +176,118 @@ export default function AdminDashboard({ user, onLogout }) {
 
   const handleBack = () => {
     setSelectedEngineer(null)
+    setSelectedIngeniero(null)
     setSelectedTicket(null)
     setEngineerTickets([])
   }
+
+  const handleTicketUpdated = useCallback(async (ticketId) => {
+    fetchDashboard()
+    await fetchTickets()
+    const actualizado = ticketsRef.current.find((t) => t.id === ticketId)
+    const detalle = actualizado || (await api.get(`/tickets/${ticketId}`).then((r) => r.data).catch(() => null))
+    if (detalle) setSelectedTicket(detalle)
+    notificar(`Estado del ticket #${detalle?.numero || ticketId} actualizado`, 'ok')
+  }, [fetchDashboard, fetchTickets, notificar])
 
   const exportarReporte = async () => {
     try {
       setNotificacion(null)
       if (notifTimer.current) clearTimeout(notifTimer.current)
-      const res = await api.get('/audit-logs?limit=10000')
-      const logs = res.data.data || []
-      const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-      const filas = [
-        ['ID de Transaccion / Log', 'Fecha y Hora Exacta (Timestamp)', 'Nombres y Apellidos del Usuario', 'Cedula de Identidad', 'Rol', 'Facultad y Carrera', 'Accion Realizada', 'Direccion IP', 'Dispositivo / User-Agent'],
-        ...logs.map((log) => [
-          log.id,
-          new Date(log.createdAt).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'medium' }),
-          log.usuario ? [log.usuario.nombre, log.usuario.apellido].filter(Boolean).join(' ') : 'Sistema',
-          log.usuario?.cedula || 'N/A',
-          log.usuario?.rol || 'N/A',
-          [log.usuario?.facultad, log.usuario?.carrera].filter(Boolean).join(' - ') || 'N/A',
-          log.accion,
-          log.ipAddress || '127.0.0.1',
-          log.userAgent || 'N/A'
-        ]),
-      ]
-      const csv = filas.map((fila) => fila.map(escape).join(',')).join('\r\n')
-      const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `Reporte_Auditoria_UTELVT_${new Date().toISOString().split('T')[0]}.csv`
-      link.click()
-      URL.revokeObjectURL(url)
-      notificar('Reporte de auditoria exportado correctamente (CSV).', 'ok')
-    } catch {
-      notificar('No se pudo generar el reporte de auditoria.', 'error')
+
+      const res = await api.get('/admin/tickets?limit=10000')
+      const tickets = res.data || []
+
+      const logoDataUrl = await new Promise((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          canvas.getContext('2d').drawImage(img, 0, 0)
+          resolve(canvas.toDataURL('image/png'))
+        }
+        img.onerror = () => resolve(null)
+        img.src = '/assets/logo-utelvt.png'
+      })
+
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+
+      const headerY = 15
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, 'PNG', 15, headerY - 3, 20, 20)
+      }
+
+      const textX = logoDataUrl ? 42 : 15
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(11)
+      doc.setTextColor(30, 30, 30)
+      doc.text('UNIVERSIDAD TECNICA LUIS VARGAS TORRES DE ESMERALDAS', textX, headerY + 2)
+
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(9)
+      doc.setTextColor(80, 80, 80)
+      doc.text('Sistema de Automatizacion de Identidad y Accesos (SAIA-SIAD)', textX, headerY + 8)
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(12)
+      doc.setTextColor(22, 101, 52)
+      doc.text('Reporte Consolidado de Solicitudes y Tickets', textX, headerY + 15)
+
+      const adminName = [user?.nombre, user?.apellido].filter(Boolean).join(' ') || 'Admin'
+      const fechaEmision = new Date().toLocaleString('es-EC', { dateStyle: 'long', timeStyle: 'short' })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(100, 100, 100)
+      doc.text(`Fecha de emision: ${fechaEmision}  |  Generado por: Admin ${adminName}`, textX, headerY + 21)
+
+      doc.setDrawColor(22, 101, 52)
+      doc.setLineWidth(0.4)
+      doc.line(15, headerY + 24, pageWidth - 15, headerY + 24)
+
+      const fmtFecha = (f) => f ? new Date(f).toLocaleString('es-EC', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
+      const rows = tickets.map((t) => [
+        t.numero,
+        [t.usuario?.nombre, t.usuario?.apellido].filter(Boolean).join(' ') || '—',
+        t.categoria?.nombre || '—',
+        (ESTADO_META[t.estado]?.label || t.estado || '—'),
+        t.citaPersonal?.ingenieroNombre || [t.asignadoA?.nombre, t.asignadoA?.apellido].filter(Boolean).join(' ') || 'Sin asignar',
+        fmtFecha(t.createdAt),
+      ])
+
+      autoTable(doc, {
+        startY: headerY + 27,
+        head: [['# Ticket', 'Solicitante', 'Categoria', 'Estado', 'Especialista Asignado', 'Fecha']],
+        body: rows,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak', font: 'helvetica' },
+        headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        alternateRowStyles: { fillColor: [240, 253, 244] },
+        columnStyles: {
+          0: { cellWidth: 28 },
+          1: { cellWidth: 42 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 25 },
+          4: { cellWidth: 52 },
+          5: { cellWidth: 35 },
+        },
+        didDrawPage: (data) => {
+          const pageH = doc.internal.pageSize.getHeight()
+          doc.setFontSize(7)
+          doc.setTextColor(150, 150, 150)
+          doc.text('SAIA-SIAD — Reporte generado automaticamente', 15, pageH - 8)
+          doc.text(`Pagina ${doc.internal.getCurrentPageInfo().pageNumber} de ${doc.internal.getNumberOfPages()}`, pageWidth - 15, pageH - 8, { align: 'right' })
+        },
+      })
+
+      doc.save(`Reporte_Solicitudes_UTELVT_${new Date().toISOString().split('T')[0]}.pdf`)
+      notificar('Reporte PDF generado correctamente.', 'ok')
+    } catch (err) {
+      console.error('Error al generar reporte PDF:', err)
+      notificar('No se pudo generar el reporte PDF.', 'error')
     }
   }
 
@@ -220,7 +310,7 @@ export default function AdminDashboard({ user, onLogout }) {
     return (
       <div className="mx-auto w-full max-w-7xl pb-10">
         <AdminHeader onRefresh={handleRefresh} onLogout={onLogout} />
-        <ValidarQRView onBack={() => { window.location.hash = '' }} onAtendido={handleAtendidoDesdeQr} />
+        <ValidarQRView onBack={() => { window.location.hash = '' }} onAtendido={handleAtendidoDesdeQr} onLogout={onLogout} />
         <NotificacionToast notificacion={notificacion} />
       </div>
     )
@@ -233,6 +323,7 @@ export default function AdminDashboard({ user, onLogout }) {
       <BannerEjecutivo
         totalTickets={resumen?.totalTickets || 0}
         enProceso={resumen?.enProceso || 0}
+        nombreCompleto={nombreCompleto}
         onEscanear={() => { window.location.hash = '#/admin/validar-qr' }}
         onReporte={exportarReporte}
       />
@@ -242,9 +333,10 @@ export default function AdminDashboard({ user, onLogout }) {
           <Loader2 className="h-10 w-10 animate-spin text-green-600" />
         </div>
       ) : selectedTicket ? (
-        <TicketDetail ticket={selectedTicket} onBack={() => setSelectedTicket(null)} />
+        <TicketDetail ticket={selectedTicket} user={user} onBack={() => setSelectedTicket(null)} onStatusApplied={handleTicketUpdated} />
       ) : selectedEngineer ? (
         <IngenieroDetail
+          ingeniero={selectedIngeniero}
           ingenieroId={selectedEngineer}
           tickets={engineerTickets}
           loading={engineerLoading}
@@ -365,7 +457,7 @@ export default function AdminDashboard({ user, onLogout }) {
                     Especialistas de Soporte
                   </p>
                   <div className="space-y-3">
-                    {dashboard?.ingenieros?.map((ingeniero) => (
+                    {(dashboard?.especialistas || dashboard?.ingenieros || [])?.map((ingeniero) => (
                       <button
                         key={ingeniero.id}
                         onClick={() => handleSelectEngineer(ingeniero.id)}
@@ -460,7 +552,7 @@ function AdminHeader({ onRefresh, onLogout }) {
 
 
 
-function BannerEjecutivo({ onEscanear, onReporte }) {
+function BannerEjecutivo({ onEscanear, onReporte, nombreCompleto = 'Admin' }) {
   return (
     <div className="relative overflow-hidden bg-slate-900/80 backdrop-blur-md border border-emerald-500/20 shadow-2xl rounded-2xl p-6 text-white mb-8">
       <div className="relative z-10">
@@ -468,7 +560,7 @@ function BannerEjecutivo({ onEscanear, onReporte }) {
           Panel de Control Central
         </span>
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">
-          ¡Hola de nuevo, <span className="text-emerald-400">Admin</span>!
+          ¡Hola Admin <span className="text-emerald-400">{nombreCompleto}</span>!
         </h1>
         <p className="mt-2 max-w-2xl text-slate-300 text-sm leading-relaxed">
           Bienvenido al centro operativo SAIA-SIAD. Supervisa las solicitudes de soporte en tiempo
@@ -565,8 +657,7 @@ function TicketsRow({ ticket, onClick }) {
   )
 }
 
-function IngenieroDetail({ ingenieroId, tickets, loading, onSelectTicket, onBack }) {
-  const ingeniero = tickets[0]?.citaPersonal
+function IngenieroDetail({ ingeniero, tickets, loading, onSelectTicket, onBack }) {
   return (
     <div className="mt-5">
       <div className="mb-5 flex items-center gap-3">
@@ -574,7 +665,11 @@ function IngenieroDetail({ ingenieroId, tickets, loading, onSelectTicket, onBack
           <ChevronLeft className="h-4 w-4" />
           Volver
         </button>
-        <h2 className="text-h2 text-ink">Solicitudes de {ingeniero?.ingenieroNombre || ingenieroId}</h2>
+        <h2 className="text-h2 text-ink">
+          {loading && !ingeniero
+            ? 'Cargando ingeniero...'
+            : `Solicitudes de Ing. ${ingeniero?.nombre || 'Especialista'}`}
+        </h2>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -618,9 +713,11 @@ function IngenieroDetail({ ingenieroId, tickets, loading, onSelectTicket, onBack
   )
 }
 
-function TicketDetail({ ticket, onBack }) {
+function TicketDetail({ ticket, user, onBack, onStatusApplied }) {
   const API_BASE = (import.meta.env.VITE_API_URL || '').replace('/api/v1', '')
   const meta = ticket.metadata || {}
+  const terminal = ESTADOS_FINALES.includes(ticket.estado)
+  const esCasoEspecial = ticket.estado === 'CASO_ESPECIAL' || ticket.isSpecialCase
 
   return (
     <div className="mt-5">
@@ -644,6 +741,35 @@ function TicketDetail({ ticket, onBack }) {
             </span>
           </div>
 
+          {esCasoEspecial && (
+            <div className="mb-5 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <div>
+                <p className="text-xs font-black text-amber-900">CASO ESPECIAL ACTIVO</p>
+                <p className="mt-0.5 text-xs font-bold leading-5 text-amber-800">
+                  Este tramite requiere atencion PRIORITARIA en ventanilla. El usuario fue notificado que debe acercarse
+                  directamente a las oficinas de TICS sin necesidad de agendar un nuevo turno.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {ticket.estado === 'CANCELADO_USUARIO' && (
+            <div className="mb-5 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" aria-hidden="true" />
+              <div>
+                <p className="text-xs font-black text-rose-900">SOLICITUD CANCELADA POR EL USUARIO</p>
+                <p className="mt-0.5 text-xs font-bold leading-5 text-rose-800">
+                  Motivo: {ticket.cancellationReason || 'No especificado'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!terminal && (
+            <AccionesEstado ticket={ticket} onSuccess={() => onStatusApplied(ticket.id)} />
+          )}
+
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
               <InfoSection title="Datos del usuario">
@@ -666,6 +792,11 @@ function TicketDetail({ ticket, onBack }) {
                 <InfoRow label="Creado" value={formatFecha(ticket.createdAt)} />
                 {ticket.atendidoEn && <InfoRow label="Atendido" value={formatFecha(ticket.atendidoEn)} />}
                 {ticket.resueltoEn && <InfoRow label="Resuelto" value={formatFecha(ticket.resueltoEn)} />}
+                {ticket.resolucion && (
+                  <div className="mt-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-bold leading-5 text-emerald-800">
+                    Solucion: {ticket.resolucion}
+                  </div>
+                )}
                 {ticket.citaPersonal && (
                   <>
                     <InfoRow icon={<HardHat className="h-4 w-4" aria-hidden="true" />} label="Especialista" value={ticket.citaPersonal.ingenieroNombre} />
@@ -703,9 +834,193 @@ function TicketDetail({ ticket, onBack }) {
               )}
             </div>
           </div>
+
+          <div className="mt-8">
+            <TicketChat ticket={ticket} currentUser={user} isAdmin />
+          </div>
         </div>
       </SpotlightCard>
     </div>
+  )
+}
+
+function AccionesEstado({ ticket, onSuccess }) {
+  const [action, setAction] = useState(null)
+  const [detalle, setDetalle] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const promptDefaults = {
+    RESUELTO: `El tramite ${ticket.numero} ha sido resuelto correctamente.`,
+    RECHAZADO: 'El tramite no puede ser procesado.',
+    CASO_ESPECIAL: 'Requiere atencion presencial prioritaria en las oficinas de TICS.',
+  }
+
+  const abrir = (tipo) => {
+    setAction(tipo)
+    setDetalle(promptDefaults[tipo] || '')
+    setError('')
+  }
+
+  const enviar = async () => {
+    if (!action) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.patch(`/tickets/${ticket.id}/estado`, {
+        status: action,
+        ...(action === 'RESUELTO' || action === 'CASO_ESPECIAL'
+          ? { resolutionNotes: detalle.trim() }
+          : { cancellationReason: detalle.trim() }),
+      })
+      setAction(null)
+      onSuccess()
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el estado del ticket')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          onClick={() => abrir('RESUELTO')}
+          className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_rgb(5,150,105,0.25)] transition-all hover:bg-emerald-500"
+        >
+          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          Marcar como resuelto
+        </button>
+        <button
+          onClick={() => abrir('RECHAZADO')}
+          className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-xs font-extrabold text-white shadow-[0_4px_12px_rgb(220,38,38,0.25)] transition-all hover:bg-red-500"
+        >
+          <XCircle className="h-4 w-4" aria-hidden="true" />
+          Cancelar tramite
+        </button>
+        <button
+          onClick={() => abrir('CASO_ESPECIAL')}
+          className="flex min-h-10 cursor-pointer items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-xs font-extrabold text-amber-900 ring-1 ring-amber-200 transition-all hover:bg-amber-100"
+        >
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          Marcar como caso especial
+        </button>
+      </div>
+
+      <EstadoActionModal
+        open={Boolean(action)}
+        accion={action}
+        ticket={ticket}
+        detalle={detalle}
+        setDetalle={setDetalle}
+        busy={busy}
+        error={error}
+        onConfirm={enviar}
+        onClose={() => setAction(null)}
+      />
+    </>
+  )
+}
+
+function EstadoActionModal({ open, accion, ticket, detalle, setDetalle, busy, error, onConfirm, onClose }) {
+  const config = {
+    RESUELTO: {
+      titulo: 'Marcar como resuelto',
+      color: 'border-emerald-200',
+      icono: <CheckCircle2 className="h-5 w-5 text-emerald-700" aria-hidden="true" />,
+      iconoBg: 'bg-emerald-50 text-emerald-700',
+      label: 'Nota de resolucion *',
+      boton: 'Confirmar resolucion',
+      botonCls: 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_4px_12px_rgb(5,150,105,0.3)]',
+    },
+    RECHAZADO: {
+      titulo: 'Cancelar tramite (rechazo)',
+      color: 'border-red-200',
+      icono: <XCircle className="h-5 w-5 text-red-700" aria-hidden="true" />,
+      iconoBg: 'bg-red-50 text-red-700',
+      label: 'Motivo del rechazo *',
+      boton: 'Confirmar cancelacion',
+      botonCls: 'bg-red-600 hover:bg-red-500 shadow-[0_4px_12px_rgb(220,38,38,0.3)]',
+    },
+    CASO_ESPECIAL: {
+      titulo: 'Marcar como caso especial',
+      color: 'border-amber-200',
+      icono: <AlertTriangle className="h-5 w-5 text-amber-600" aria-hidden="true" />,
+      iconoBg: 'bg-amber-50 text-amber-600',
+      label: 'Instrucciones de atencion',
+      boton: 'Confirmar caso especial',
+      botonCls: 'bg-amber-500 hover:bg-amber-400 shadow-[0_4px_12px_rgb(245,158,11,0.35)]',
+    },
+  }
+  const meta = config[accion] || config.RESUELTO
+
+  return (
+    <AnimatePresence>
+      {open && ticket && (
+        <motion.div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            className={`relative w-full max-w-md rounded-3xl border-2 bg-white p-6 shadow-[0_32px_64px_rgba(0,0,0,0.25)] ${meta.color}`}
+          >
+            <div className="flex items-start gap-3">
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${meta.iconoBg}`}>
+                {meta.icono}
+              </span>
+              <div>
+                <h3 className="text-h3 text-ink">{meta.titulo}</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  Ticket <span className="font-mono font-black text-ink">{ticket.numero}</span> — este cambio
+                  notificara al solicitante en tiempo real.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label htmlFor="estado-action-nota" className="mb-1 block text-xs font-extrabold text-slate-600">
+                {meta.label} *
+              </label>
+              <textarea
+                id="estado-action-nota"
+                value={detalle}
+                onChange={(e) => setDetalle(e.target.value)}
+                rows={3}
+                className="field"
+              />
+              {error && <p className="mt-2 text-xs font-bold text-red-600">{error}</p>}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={onClose}
+                className="flex min-h-10 cursor-pointer items-center rounded-xl border border-green-600/10 bg-white px-4 py-2 text-sm font-extrabold text-slate-600 transition-colors hover:bg-green-50"
+              >
+                Volver
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={busy || detalle.trim().length < 5}
+                className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-extrabold text-white transition-all disabled:cursor-not-allowed disabled:opacity-40 ${meta.botonCls}`}
+              >
+                {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                {meta.boton}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

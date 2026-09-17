@@ -126,12 +126,23 @@ const RequestForm = memo(function RequestForm({ user, onSubmit, onInterceptSubmi
     setLoading(true)
     try {
       if (esAtencionPersona) {
-        onInterceptSubmit(buildPayload({ horario: horarioSeleccionado }))
+        await onInterceptSubmit(buildPayload({ horario: horarioSeleccionado }))
       } else {
         await onSubmit(buildPayload())
       }
-    } catch {
-      setErrors({ submit: 'Error al procesar la solicitud. Intenta nuevamente.' })
+    } catch (err) {
+      const status = err.response?.status
+      if (status === 409) {
+        setErrors({
+          submit:
+            err.response?.data?.message ||
+            'Esta cedula ya tiene una solicitud o cita activa en el sistema. Debe completar o cancelar su turno actual antes de solicitar uno nuevo.',
+        })
+      } else {
+        setErrors({
+          submit: err.response?.data?.message || err.message || 'Error al procesar la solicitud. Intenta nuevamente.',
+        })
+      }
     } finally {
       setLoading(false)
     }

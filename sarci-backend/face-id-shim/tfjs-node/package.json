@@ -1,0 +1,8 @@
+{
+  "name": "@tensorflow/tfjs-node",
+  "version": "4.22.0",
+  "description": "Shim local para @tensorflow/tfjs-node: reexpide el backend CPU de @tensorflow/tfjs (100% JavaScript) evitando binarios nativos incompatibles con Node 24",
+  "type": "commonjs",
+  "main": "index.js",
+  "private": true
+}

@@ -5,8 +5,8 @@ import Login from './components/auth/Login'
 import Register from './components/auth/Register'
 import Dashboard from './components/dashboard/Dashboard'
 import AdminDashboard from './components/dashboard/AdminDashboard'
-import IngenierosModal from './components/dashboard/IngenierosModal'
 import TicketComprobanteModal from './components/dashboard/TicketComprobanteModal'
+import ChatbotWidget from './components/common/ChatbotWidget'
 import { api } from './lib/api'
 import { useLenis } from './hooks/useLenis'
 import { EASE_OUT } from './lib/motion'
@@ -32,8 +32,6 @@ export default function App() {
 
   const [authView, setAuthView] = useState(AUTH_VIEWS.WELCOME)
   const [currentUser, setCurrentUser] = useState(null)
-  const [interceptPayload, setInterceptPayload] = useState(null)
-  const [ingenierosOpen, setIngenierosOpen] = useState(false)
   const [comprobanteOpen, setComprobanteOpen] = useState(false)
   const [ticketDigital, setTicketDigital] = useState(null)
 
@@ -73,6 +71,14 @@ export default function App() {
 
   const handleLogin = useCallback(async (email, password) => {
     const response = await api.post('/auth/login', { email, password })
+    localStorage.setItem('token', response.data.token)
+    localStorage.setItem('refreshToken', response.data.refreshToken)
+    localStorage.setItem('user', JSON.stringify(response.data.user))
+    setCurrentUser(response.data.user)
+  }, [])
+
+  const handleFaceLogin = useCallback(async (image) => {
+    const response = await api.post('/auth/face-login', { image })
     localStorage.setItem('token', response.data.token)
     localStorage.setItem('refreshToken', response.data.refreshToken)
     localStorage.setItem('user', JSON.stringify(response.data.user))
@@ -132,20 +138,43 @@ export default function App() {
     return { ticketId: response.data.numero }
   }, [])
 
-  const handleInterceptSubmit = useCallback((payload) => {
-    setInterceptPayload(payload)
-    setIngenierosOpen(true)
-  }, [])
+  const handleInterceptSubmit = useCallback(async (payload) => {
+    const MOTIVO_LABEL = {
+      'atencion-persona': 'Atencion en Persona',
+    }
 
-  const handleIngenierosClose = useCallback(() => {
-    setIngenierosOpen(false)
-    setInterceptPayload(null)
-  }, [])
+    let fotoCedulaUrl = ''
+    if (payload.archivoCedula) {
+      fotoCedulaUrl = await uploadCedula(payload.archivoCedula)
+    }
 
-  const handleIngenierosSuccess = useCallback((ticketData) => {
-    setIngenierosOpen(false)
-    setInterceptPayload(null)
-    setTicketDigital(ticketData)
+    const ticketResponse = await api.post('/tickets', {
+      titulo: `Solicitud de ${MOTIVO_LABEL[payload.motivoSolicitud] || payload.motivoSolicitud} - ${payload.programaAcademico}`,
+      descripcion: payload.descripcion,
+      tipo: 'OTRO',
+      cedula: payload.cedulaIdentidad || '',
+      fotoCedulaUrl,
+      atencionEnPersona: true,
+      metadata: {
+        cedula: payload.cedulaIdentidad || '',
+        rol: payload.rolUsuario,
+        facultad: payload.facultad,
+        facultadNombre: payload.facultadNombre,
+        carrera: payload.carrera,
+        cargo: payload.cargo,
+        motivoSolicitud: payload.motivoSolicitud,
+      },
+    })
+
+    const ticketId = ticketResponse.data.id
+
+    const citaResponse = await api.post('/citas', {
+      ticketId,
+      fecha: payload.horario.fecha,
+      hora: payload.horario.hora,
+    })
+
+    setTicketDigital(citaResponse.data.ticketDigital)
     setComprobanteOpen(true)
   }, [])
 
@@ -190,6 +219,7 @@ export default function App() {
               {authView === AUTH_VIEWS.LOGIN && (
                 <Login
                   onLogin={handleLogin}
+                  onFaceLogin={handleFaceLogin}
                   onBack={() => setAuthView(AUTH_VIEWS.WELCOME)}
                   onGoRegister={() => setAuthView(AUTH_VIEWS.REGISTER)}
                 />
@@ -206,17 +236,15 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <IngenierosModal
-        open={ingenierosOpen}
-        onClose={handleIngenierosClose}
-        formPayload={interceptPayload}
-        onSuccess={handleIngenierosSuccess}
-      />
-
       <TicketComprobanteModal
         open={comprobanteOpen}
         onClose={handleComprobanteClose}
         ticket={ticketDigital}
+      />
+
+      <ChatbotWidget
+        user={currentUser}
+        isAdmin={isAdmin}
       />
     </div>
   )

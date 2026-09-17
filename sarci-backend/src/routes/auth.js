@@ -5,6 +5,7 @@ import { validateLogin, validateRegister, validateForgotPassword, validateResetP
 const router = Router();
 
 router.post('/login', validateLogin, authController.login);
+router.post('/face-login', authController.faceLogin);
 router.post('/register', validateRegister, authController.register);
 router.post('/refresh', authController.refreshToken);
 router.post('/forgot-password', validateForgotPassword, authController.forgotPassword);

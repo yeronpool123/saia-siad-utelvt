@@ -15,16 +15,29 @@ async function request(endpoint, options = {}) {
     headers,
   })
 
-  const json = await response.json()
+  const json = await parseResponse(response)
 
   if (!response.ok) {
-    const error = new Error(json.message || 'Error del servidor')
-    error.status = response.status
-    error.errors = json.errors
-    throw error
+    throw buildError(response, json)
   }
 
   return json
+}
+
+async function parseResponse(response) {
+  try {
+    return await response.json()
+  } catch {
+    return {}
+  }
+}
+
+function buildError(response, json) {
+  const error = new Error(json?.message || 'Error del servidor')
+  error.status = response.status
+  error.errors = json?.errors
+  error.response = { status: response.status, data: json, headers: response.headers }
+  return error
 }
 
 export const api = {
@@ -47,13 +60,10 @@ export const api = {
       body: formData,
     })
 
-    const json = await response.json()
+    const json = await parseResponse(response)
 
     if (!response.ok) {
-      const error = new Error(json.message || 'Error del servidor')
-      error.status = response.status
-      error.errors = json.errors
-      throw error
+      throw buildError(response, json)
     }
 
     return json

@@ -46,15 +46,41 @@ export const validateUpdateTicket = (req, res, next) => {
 };
 
 export const validateCambiarEstado = (req, res, next) => {
-  const { estado } = req.body;
+  const { estado, status } = req.body;
   const errors = [];
 
-  const estadosValidos = ['PENDIENTE', 'EN_PROCESO', 'ESPERANDO_RESPUESTA', 'RESUELTO', 'CERRADO', 'RECHAZADO'];
-  if (!estado) errors.push('El campo "estado" es obligatorio');
-  else if (!estadosValidos.includes(estado)) errors.push(`Estado inválido: "${estado}"`);
+  const MAPA_ALIAS = {
+    PENDING: 'PENDIENTE',
+    IN_PROGRESS: 'EN_PROCESO',
+    APPROVED: 'RESUELTO',
+    CANCELLED_ADMIN: 'RECHAZADO',
+    SPECIAL_CASE: 'CASO_ESPECIAL',
+  };
+
+  const estadosValidos = ['PENDIENTE', 'EN_PROCESO', 'ESPERANDO_RESPUESTA', 'RESUELTO', 'CERRADO', 'RECHAZADO', 'CASO_ESPECIAL'];
+  const estadoRaw = estado || status;
+  const estadoFinal = MAPA_ALIAS[estadoRaw] || estadoRaw;
+
+  if (!estadoRaw) errors.push('El campo "estado" es obligatorio');
+  else if (!estadosValidos.includes(estadoFinal)) errors.push(`Estado inválido: "${estadoRaw}"`);
 
   if (errors.length > 0) {
     return res.status(400).json({ success: false, status: 400, message: 'Datos inválidos', errors });
+  }
+
+  req.body.estado = estadoFinal;
+  next();
+};
+
+export const validateCancelarUsuario = (req, res, next) => {
+  const { reason } = req.body;
+  const errors = [];
+
+  if (!reason) errors.push('El campo "reason" es obligatorio');
+  else if (String(reason).trim().length < 5) errors.push('El motivo debe tener al menos 5 caracteres');
+
+  if (errors.length > 0) {
+    return res.status(400).json({ success: false, status: 400, message: 'Datos de cancelacion invalidos', errors });
   }
 
   next();

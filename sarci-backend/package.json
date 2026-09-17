@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "dev": "nodemon --exec npx tsx src/index.js",
+    "dev": "node ./scripts/predev.mjs && nodemon --exec npx tsx src/index.js",
     "start": "npx tsx src/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -27,14 +27,20 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@tensorflow/tfjs-node": "file:face-id-shim/tfjs-node",
+    "@vladmandic/face-api": "^1.7.15",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
+    "jpeg-js": "^0.4.4",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "pg": "^8.22.0",
+    "pngjs": "^7.0.0",
     "socket.io": "^4.8.3"
   },
   "devDependencies": {

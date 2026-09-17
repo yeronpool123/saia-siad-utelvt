@@ -1,73 +1,18 @@
-// Mock Prisma Client
-const mockData = {
-  tickets: [],
-  usuarios: [
-    {
-      id: "admin-123",
-      email: "admin@utelvt.edu.ec",
-      passwordHash: "$2b$10$FpeehfP/gkVJ9K0ryZvMmOSwD8QqQ7STCsG1ZNOkRaXiRUampvmY2",
-      nombre: "Administrador",
-      apellido: "UTELVT",
-      cedula: "0800000000",
-      rol: "SUPER_ADMIN",
-      activo: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }
-  ],
-  citas: []
-};
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../../generated/prisma/index.js';
 
-const prisma = {
-  $connect: async () => console.log('Mock DB connected'),
-  $disconnect: async () => {},
-  $queryRaw: async () => [{ 1: 1 }],
-  ticket: {
-    count: async () => mockData.tickets.length,
-    findMany: async () => mockData.tickets,
-    findUnique: async ({ where }) => mockData.tickets.find(t => t.id === where.id),
-    create: async ({ data }) => {
-      const newTicket = { id: Math.random().toString(), createdAt: new Date(), ...data };
-      mockData.tickets.push(newTicket);
-      return newTicket;
-    },
-    update: async ({ where, data }) => {
-      const idx = mockData.tickets.findIndex(t => t.id === where.id);
-      if (idx !== -1) {
-        mockData.tickets[idx] = { ...mockData.tickets[idx], ...data, updatedAt: new Date() };
-        return mockData.tickets[idx];
-      }
-      return null;
-    }
-  },
-  usuario: {
-    findUnique: async ({ where }) => mockData.usuarios.find(u => u.email === where.email),
-    findFirst: async ({ where }) => mockData.usuarios.find(u => u.email === where.email || u.cedula === where.cedula),
-    create: async ({ data }) => {
-      const newUser = { id: Math.random().toString(), createdAt: new Date(), ...data };
-      mockData.usuarios.push(newUser);
-      return newUser;
-    },
-    update: async () => ({})
-  },
-  citaPersonal: {
-    findMany: async () => mockData.citas,
-    count: async () => mockData.citas.length,
-    create: async ({ data }) => {
-      const newCita = { id: Math.random().toString(), createdAt: new Date(), ...data };
-      mockData.citas.push(newCita);
-      return newCita;
-    },
-    update: async () => ({})
-  },
-  auditLog: {
-    create: async () => ({})
-  },
-  resetToken: {
-    create: async () => ({}),
-    findUnique: async () => null,
-    update: async () => ({})
-  }
-};
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+loadEnv({ path: resolve(__dirname, '../../.env'), quiet: true });
+loadEnv({ path: resolve(__dirname, '../../.env.local'), quiet: true });
+
+const appConfig = { connectionString: process.env.DATABASE_URL };
+if (process.env.DATABASE_SCHEMA) appConfig.schema = process.env.DATABASE_SCHEMA;
+
+const adapter = new PrismaPg(appConfig);
+const prisma = new PrismaClient({ adapter });
 
 export default prisma;
